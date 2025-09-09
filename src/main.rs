@@ -1,7 +1,20 @@
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
 use bevy::window::WindowResolution;
+use bevy_simple_text_input::TextInputPlugin;
 use rand::Rng;
+
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
+pub enum GameState {
+    #[default]
+    Splash,
+    Menu,
+    CharacterCreation,
+    InGame,
+    Leaderboard,
+    Credits,
+    Settings,
+}
 
 #[derive(Component)]
 struct Background;
@@ -15,6 +28,19 @@ struct Score {
 impl Default for Score {
     fn default() -> Self {
         Score { value: 0 }
+    }
+}
+
+#[derive(Resource)]
+enum CharacterCreationData {
+    Unknown,
+    Girl(String),
+    Boy(String),
+}
+
+impl Default for CharacterCreationData {
+    fn default() -> Self {
+        CharacterCreationData::Unknown
     }
 }
 
@@ -101,7 +127,37 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
         )
+        .add_plugins(TextInputPlugin)
+        .init_state::<GameState>()
         .init_resource::<Score>()
+        .init_resource::<CharacterCreationData>()
+        .init_resource::<SplashTimer>()
+        // Splash state systems
+        .add_systems(OnEnter(GameState::Splash), setup_splash_screen)
+        .add_systems(Update, countdown.run_if(in_state(GameState::Splash)))
+        .add_systems(OnExit(GameState::Splash), despawn_screen::<OnSplashScreen>)
+        // Menu state systems
+        .add_systems(OnEnter(GameState::Menu), setup_menu)
+        .add_systems(
+            Update,
+            handle_menu_interactions.run_if(in_state(GameState::Menu)),
+        )
+        .add_systems(OnExit(GameState::Menu), despawn_screen::<OnMenuScreen>)
+        // Character creation state systems
+        .add_systems(
+            OnEnter(GameState::CharacterCreation),
+            setup_character_creation_ui,
+        )
+        .add_systems(
+            Update,
+            handle_character_creation_interactions.run_if(in_state(GameState::CharacterCreation)),
+        )
+        .add_systems(
+            OnExit(GameState::CharacterCreation),
+            despawn_screen::<OnCharacterCreationScreen>,
+        )
+        // InGame, Leaderboard, Credits, and Settings screens will need their own system sets
+        // ...
         .add_systems(
             Startup,
             (setup, setup_background, setup_enemies, setup_score_ui),
@@ -118,6 +174,123 @@ fn main() {
         )
         .add_systems(Update, enemies_movement)
         .run();
+}
+
+// Marker component for the splash screen
+#[derive(Component)]
+struct OnSplashScreen;
+
+// Timer resource for splash screen
+#[derive(Resource)]
+struct SplashTimer {
+    timer: Timer,
+}
+impl Default for SplashTimer {
+    fn default() -> Self {
+        SplashTimer {
+            timer: Timer::from_seconds(3.0, TimerMode::Once),
+        }
+    }
+}
+
+fn setup_splash_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn((Camera2d::default(), OnSplashScreen));
+
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor::from(Color::srgb(0.9, 0.5, 0.7)),
+            OnSplashScreen,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("DIAMOND DASH"),
+                TextFont {
+                    font: Default::default(),
+                    font_size: 40.0,
+                    ..Default::default()
+                },
+                TextColor(Color::BLACK.into()),
+            ));
+        });
+}
+
+fn countdown(
+    mut timer: ResMut<SplashTimer>,
+    time: Res<Time>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    timer.timer.tick(time.delta());
+    if timer.timer.finished() {
+        next_state.set(GameState::Menu);
+    }
+}
+
+// Generic despawn system for cleanup
+fn despawn_screen<T: Component>(mut commands: Commands, query: Query<Entity, With<T>>) {
+    for entity in query.iter() {
+        commands.entity(entity).despawn();
+    }
+}
+
+#[derive(Component)]
+struct OnMenuScreen;
+
+// A marker component for menu buttons
+#[derive(Component)]
+enum MenuButtonAction {
+    NewGame,
+    Leaderboard,
+    Credits,
+    Settings,
+    Quit,
+}
+
+fn setup_menu(mut commands: Commands) {
+    commands.spawn((Camera2d::default(), OnMenuScreen));
+
+    // UI structure similar to previous examples...
+    // ... with buttons that have a `MenuButtonAction` component
+    // Example: commands.spawn((ButtonBundle { ... }, MenuButtonAction::NewGame));
+}
+
+fn handle_menu_interactions(
+    mut interaction_query: Query<(&Interaction, &MenuButtonAction), Changed<Interaction>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    for (interaction, button_action) in interaction_query.iter() {
+        if *interaction == Interaction::Pressed {
+            match button_action {
+                MenuButtonAction::NewGame => next_state.set(GameState::CharacterCreation),
+                MenuButtonAction::Leaderboard => next_state.set(GameState::Leaderboard),
+                MenuButtonAction::Credits => next_state.set(GameState::Credits),
+                MenuButtonAction::Settings => next_state.set(GameState::Settings),
+                MenuButtonAction::Quit => todo!("Add logic to quit the application"),
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+struct OnCharacterCreationScreen;
+
+// The CharacterCreationData resource, Gender enum, and UI marker components are defined as in previous steps.
+
+fn setup_character_creation_ui(mut commands: Commands) {
+    // ... UI setup for character creation screen, similar to previous step ...
+    // ... Ensure the root UI node has the `OnCharacterCreationScreen` marker component
+}
+
+fn handle_character_creation_interactions(// ... query text input and button interactions ...
+    // ... transition to `GameState::InGame` when confirmed ...
+) {
+    // ... (logic from previous step)
 }
 
 fn setup_background(
