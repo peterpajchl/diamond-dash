@@ -4,6 +4,25 @@ use bevy::window::WindowResolution;
 use rand::Rng;
 
 #[derive(Component)]
+struct Background;
+
+// Score resource
+#[derive(Resource)]
+struct Score {
+    value: usize,
+}
+
+impl Default for Score {
+    fn default() -> Self {
+        Score { value: 0 }
+    }
+}
+
+// A marker component to mark the score text entity
+#[derive(Component)]
+struct ScoreDisplay;
+
+#[derive(Component)]
 struct Player;
 
 #[derive(Component)]
@@ -82,14 +101,45 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
         )
-        .add_systems(Startup, setup)
-        .add_systems(Startup, setup_enemies)
+        .init_resource::<Score>()
+        .add_systems(
+            Startup,
+            (setup, setup_background, setup_enemies, setup_score_ui),
+        )
         .add_systems(
             Update,
-            (player_movement, animate_sprite, update_player_animation),
+            (
+                player_movement,
+                animate_sprite,
+                update_player_animation,
+                update_score_ui,
+                collision_detection,
+            ),
         )
         .add_systems(Update, enemies_movement)
         .run();
+}
+
+fn setup_background(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+) {
+    let bg_layout = TextureAtlasLayout::from_grid(UVec2::new(1280, 640), 1, 1, None, None);
+    let bg_layout_handle = texture_atlas_layouts.add(bg_layout);
+    // Spawn the background image
+    commands.spawn((
+        Sprite {
+            image: asset_server.load("sprites/diamond_dash_bg.png"),
+            texture_atlas: Some(TextureAtlas {
+                layout: bg_layout_handle,
+                index: 0,
+            }),
+            ..default()
+        },
+        Transform::from_xyz(320.0, 160.0, -100.0).with_scale(Vec3::splat(0.5)),
+        Background, // Attach the marker component
+    ));
 }
 
 fn setup_enemies(
@@ -210,6 +260,29 @@ fn setup(
     ));
 }
 
+fn collision_detection(
+    mut commands: Commands,
+    enemy_query: Query<(Entity, &Transform), With<Enemy>>,
+    hero_query: Query<(&Transform,), With<Player>>,
+    score: Res<Score>,
+) {
+    let hero_transform = hero_query.single().unwrap();
+
+    for (enemy_entity, enemy_transform) in enemy_query.iter() {
+        let distance = hero_transform
+            .0
+            .translation
+            .distance(enemy_transform.translation);
+
+        if distance < 30.0 {
+            commands.entity(enemy_entity).despawn();
+            commands.insert_resource(Score {
+                value: score.value + 1,
+            });
+        }
+    } // Placeholder for future collision detection logic
+}
+
 fn enemies_movement(
     mut query: Query<(&mut Transform, &mut EnemyMovement)>,
     window_query: Query<&Window, With<Window>>,
@@ -224,7 +297,7 @@ fn enemies_movement(
     let x_max = window_width;
     let y_min = 0.0;
     let y_max = window_height;
-    dbg!(x_min, x_max, y_min, y_max);
+
     for (mut transform, mut enemy_movement) in &mut query {
         let mut translation = transform.translation;
 
@@ -478,6 +551,61 @@ fn update_player_animation(
 
             sprite.image = new_texture_handle;
             animation_timer.reset(); // Reset animation timer
+        }
+    }
+}
+
+fn setup_score_ui(mut commands: Commands) {
+    // Top-level node for the UI
+    commands
+        .spawn((Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(50.0),
+            justify_content: JustifyContent::Center, // Left align horizontally
+            align_items: AlignItems::Center,         // Top align vertically
+            ..default()
+        },))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        width: Val::Px(150.0),
+                        height: Val::Px(40.0),
+                        justify_content: JustifyContent::Center, // Left align horizontally
+                        align_items: AlignItems::Center,         // Top align vertically
+                        padding: UiRect::all(Val::Px(20.0)),
+                        ..default()
+                    },
+                    BorderRadius::all(Val::Px(8.)),
+                    BackgroundColor(Color::srgba(0.1, 0.1, 0.1, 0.5).into()),
+                ))
+                .with_children(|parent| {
+                    // Text entity for the score
+                    parent.spawn((
+                        Text::new("score 0"),
+                        TextFont {
+                            font: Default::default(),
+                            font_size: 20.0,
+                            ..Default::default()
+                        },
+                        TextColor(Color::BLACK.into()),
+                        ScoreDisplay, // Attach the marker component
+                    ));
+                });
+        });
+}
+
+fn update_score_ui(
+    mut commands: Commands, // Need Commands to re-insert the component
+    score: Res<Score>,
+    mut query: Query<(Entity, &Text), With<ScoreDisplay>>,
+) {
+    // Only update if the score has changed
+    if score.is_changed() {
+        if let Ok((entity, text_component)) = query.single_mut() {
+            let updated_text_component = Text::new(format!("score {}", score.value));
+
+            commands.entity(entity).insert(updated_text_component);
         }
     }
 }
