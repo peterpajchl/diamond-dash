@@ -1,6 +1,6 @@
-use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
 use bevy::window::WindowResolution;
+use bevy::{prelude::*, winit::WinitSettings};
 use bevy_simple_text_input::TextInputPlugin;
 use rand::Rng;
 
@@ -129,6 +129,7 @@ fn main() {
         )
         .add_plugins(TextInputPlugin)
         .init_state::<GameState>()
+        .insert_resource(WinitSettings::desktop_app())
         .init_resource::<Score>()
         .init_resource::<CharacterCreationData>()
         .init_resource::<SplashTimer>()
@@ -308,9 +309,45 @@ fn setup_menu(mut commands: Commands) {
         }),
     ));
 
-    // UI structure similar to previous examples...
-    // ... with buttons that have a `MenuButtonAction` component
-    // Example: commands.spawn((ButtonBundle { ... }, MenuButtonAction::NewGame));
+    commands
+        .spawn(
+            (Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            }),
+        )
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(150.0),
+                        height: Val::Px(65.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BorderRadius::all(Val::Px(8.0)),
+                    BorderColor(Color::BLACK),
+                    BackgroundColor(Color::WHITE),
+                    MenuButtonAction::NewGame,
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Button"),
+                        TextFont {
+                            font_size: 30.0,
+                            font: Default::default(),
+                            ..default()
+                        },
+                        TextColor::from(Color::BLACK),
+                    ));
+                });
+        });
 }
 
 fn handle_menu_interactions(
@@ -832,6 +869,51 @@ fn update_score_ui(
             let updated_text_component = Text::new(format!("score {}", score.value));
 
             commands.entity(entity).insert(updated_text_component);
+        }
+    }
+}
+
+fn button_system(
+    mut interaction_query: Query<
+        (
+            &Interaction,
+            &mut BackgroundColor,
+            &mut BorderColor,
+            &MenuButtonAction,
+        ),
+        (Changed<Interaction>, With<Button>),
+    >,
+) {
+    for (interaction, mut color, mut border_color, menu_button_action) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                *color = PRESSED_BUTTON.into();
+                border_color.0 = Color::RED;
+
+                // Match on the button's action to trigger the correct event
+                match menu_button_action {
+                    MenuButtonAction::NewGame => {
+                        println!("Starting a new game!");
+                        // You can add your game logic here, like spawning the player
+                    }
+                    MenuButtonAction::Settings => {
+                        println!("Opening the settings menu.");
+                        // Transition to a settings state or open a menu popup
+                    }
+                    MenuButtonAction::Quit => {
+                        println!("Quitting the game.");
+                        // Bevy's built-in `AppExit` event can be used to close the app
+                    }
+                }
+            }
+            Interaction::Hovered => {
+                *color = HOVERED_BUTTON.into();
+                border_color.0 = Color::WHITE;
+            }
+            Interaction::None => {
+                *color = NORMAL_BUTTON.into();
+                border_color.0 = Color::BLACK;
+            }
         }
     }
 }
