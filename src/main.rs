@@ -159,7 +159,7 @@ fn main() {
         // InGame, Leaderboard, Credits, and Settings screens will need their own system sets
         // ...
         .add_systems(
-            Startup,
+            OnEnter(GameState::InGame),
             (setup, setup_background, setup_enemies, setup_score_ui),
         )
         .add_systems(
@@ -170,9 +170,10 @@ fn main() {
                 update_player_animation,
                 update_score_ui,
                 collision_detection,
-            ),
+            )
+                .run_if(in_state(GameState::InGame)),
         )
-        .add_systems(Update, enemies_movement)
+        .add_systems(Update, enemies_movement.run_if(in_state(GameState::InGame)))
         .run();
 }
 
@@ -193,8 +194,45 @@ impl Default for SplashTimer {
     }
 }
 
-fn setup_splash_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((Camera2d::default(), OnSplashScreen));
+fn setup_splash_screen(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+) {
+    let camera = Camera2d::default();
+
+    commands.spawn((
+        camera,
+        Transform {
+            translation: Vec3::new(640.0 / 2.0, 320.0 / 2.0, 0.0),
+            ..default()
+        },
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: ScalingMode::AutoMax {
+                max_width: 640.0,
+                max_height: 320.0,
+            },
+            scale: 1.0,
+            ..OrthographicProjection::default_2d()
+        }),
+        OnSplashScreen,
+    ));
+
+    let bg_layout = TextureAtlasLayout::from_grid(UVec2::new(1280, 640), 1, 1, None, None);
+    let bg_layout_handle = texture_atlas_layouts.add(bg_layout);
+    // Spawn the background image
+    commands.spawn((
+        Sprite {
+            image: asset_server.load("sprites/diamond_dash_splash.png"),
+            texture_atlas: Some(TextureAtlas {
+                layout: bg_layout_handle,
+                index: 0,
+            }),
+            ..default()
+        },
+        Transform::from_xyz(320.0, 160.0, -100.0).with_scale(Vec3::splat(0.5)),
+        OnSplashScreen,
+    ));
 
     commands
         .spawn((
@@ -205,12 +243,11 @@ fn setup_splash_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor::from(Color::srgb(0.9, 0.5, 0.7)),
             OnSplashScreen,
         ))
         .with_children(|parent| {
             parent.spawn((
-                Text::new("DIAMOND DASH"),
+                Text::new("Starting..."),
                 TextFont {
                     font: Default::default(),
                     font_size: 40.0,
@@ -253,7 +290,23 @@ enum MenuButtonAction {
 }
 
 fn setup_menu(mut commands: Commands) {
-    commands.spawn((Camera2d::default(), OnMenuScreen));
+    let camera = Camera2d::default();
+
+    commands.spawn((
+        camera,
+        Transform {
+            translation: Vec3::new(640.0 / 2.0, 320.0 / 2.0, 0.0),
+            ..default()
+        },
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: ScalingMode::AutoMax {
+                max_width: 640.0,
+                max_height: 320.0,
+            },
+            scale: 1.0,
+            ..OrthographicProjection::default_2d()
+        }),
+    ));
 
     // UI structure similar to previous examples...
     // ... with buttons that have a `MenuButtonAction` component
