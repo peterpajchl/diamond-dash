@@ -304,6 +304,7 @@ fn setup_menu(mut commands: Commands) {
             scale: 1.0,
             ..OrthographicProjection::default_2d()
         }),
+        OnMenuScreen,
     ));
 
     commands
@@ -311,11 +312,14 @@ fn setup_menu(mut commands: Commands) {
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(10.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 ..default()
             },
             BackgroundColor(Color::WHITE),
+            OnMenuScreen,
         ))
         .with_children(|parent| {
             parent
@@ -323,7 +327,7 @@ fn setup_menu(mut commands: Commands) {
                     Button,
                     Node {
                         width: Val::Px(150.0),
-                        height: Val::Px(60.0),
+                        height: Val::Px(40.0),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         border: UiRect::all(Val::Px(2.0)),
@@ -343,7 +347,7 @@ fn setup_menu(mut commands: Commands) {
                             font: Default::default(),
                             ..default()
                         },
-                        //TextColor::from(Color::BLACK),
+                        TextColor::from(Color::BLACK),
                     ));
                 });
 
@@ -352,7 +356,7 @@ fn setup_menu(mut commands: Commands) {
                     Button,
                     Node {
                         width: Val::Px(150.0),
-                        height: Val::Px(60.0),
+                        height: Val::Px(40.0),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         border: UiRect::all(Val::Px(2.0)),
@@ -372,7 +376,7 @@ fn setup_menu(mut commands: Commands) {
                             font: Default::default(),
                             ..default()
                         },
-                        //TextColor::from(Color::BLACK),
+                        TextColor::from(Color::BLACK),
                     ));
                 });
         });
@@ -460,6 +464,7 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
+    println!("setup game");
     // Load textures for all animations
     let texture_idle = asset_server.load("sprites/characters/hero/idle/idle.png");
     let texture_walk = asset_server.load("sprites/characters/hero/walk/walk.png");
