@@ -139,10 +139,7 @@ fn main() {
         .add_systems(OnExit(GameState::Splash), despawn_screen::<OnSplashScreen>)
         // Menu state systems
         .add_systems(OnEnter(GameState::Menu), setup_menu)
-        .add_systems(
-            Update,
-            handle_menu_interactions.run_if(in_state(GameState::Menu)),
-        )
+        .add_systems(Update, button_system.run_if(in_state(GameState::Menu)))
         .add_systems(OnExit(GameState::Menu), despawn_screen::<OnMenuScreen>)
         // Character creation state systems
         .add_systems(
@@ -310,22 +307,23 @@ fn setup_menu(mut commands: Commands) {
     ));
 
     commands
-        .spawn(
-            (Node {
+        .spawn((
+            Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 ..default()
-            }),
-        )
+            },
+            BackgroundColor(Color::WHITE),
+        ))
         .with_children(|parent| {
             parent
                 .spawn((
                     Button,
                     Node {
                         width: Val::Px(150.0),
-                        height: Val::Px(65.0),
+                        height: Val::Px(60.0),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         border: UiRect::all(Val::Px(2.0)),
@@ -334,37 +332,50 @@ fn setup_menu(mut commands: Commands) {
                     BorderRadius::all(Val::Px(8.0)),
                     BorderColor(Color::BLACK),
                     BackgroundColor(Color::WHITE),
+                    TextColor(Color::BLACK),
                     MenuButtonAction::NewGame,
                 ))
                 .with_children(|parent| {
                     parent.spawn((
-                        Text::new("Button"),
+                        Text::new("New Game"),
                         TextFont {
-                            font_size: 30.0,
+                            font_size: 24.0,
                             font: Default::default(),
                             ..default()
                         },
-                        TextColor::from(Color::BLACK),
+                        //TextColor::from(Color::BLACK),
+                    ));
+                });
+
+            parent
+                .spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(150.0),
+                        height: Val::Px(60.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BorderRadius::all(Val::Px(8.0)),
+                    BorderColor(Color::BLACK),
+                    BackgroundColor(Color::WHITE),
+                    TextColor(Color::BLACK),
+                    MenuButtonAction::Quit,
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new("Quit"),
+                        TextFont {
+                            font_size: 24.0,
+                            font: Default::default(),
+                            ..default()
+                        },
+                        //TextColor::from(Color::BLACK),
                     ));
                 });
         });
-}
-
-fn handle_menu_interactions(
-    mut interaction_query: Query<(&Interaction, &MenuButtonAction), Changed<Interaction>>,
-    mut next_state: ResMut<NextState<GameState>>,
-) {
-    for (interaction, button_action) in interaction_query.iter() {
-        if *interaction == Interaction::Pressed {
-            match button_action {
-                MenuButtonAction::NewGame => next_state.set(GameState::CharacterCreation),
-                MenuButtonAction::Leaderboard => next_state.set(GameState::Leaderboard),
-                MenuButtonAction::Credits => next_state.set(GameState::Credits),
-                MenuButtonAction::Settings => next_state.set(GameState::Settings),
-                MenuButtonAction::Quit => todo!("Add logic to quit the application"),
-            }
-        }
-    }
 }
 
 #[derive(Component)]
@@ -873,28 +884,38 @@ fn update_score_ui(
     }
 }
 
+fn exit_game_system(mut exit: EventWriter<AppExit>) {
+    exit.send(AppExit::Success);
+}
+
 fn button_system(
     mut interaction_query: Query<
         (
             &Interaction,
             &mut BackgroundColor,
             &mut BorderColor,
+            &mut TextColor,
             &MenuButtonAction,
         ),
         (Changed<Interaction>, With<Button>),
     >,
+    mut exit: EventWriter<AppExit>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
-    for (interaction, mut color, mut border_color, menu_button_action) in &mut interaction_query {
+    for (interaction, mut color, mut border_color, mut text_color, menu_button_action) in
+        &mut interaction_query
+    {
         match *interaction {
             Interaction::Pressed => {
-                *color = PRESSED_BUTTON.into();
-                border_color.0 = Color::RED;
+                *color = Color::BLACK.into();
+                border_color.0 = Color::BLACK.into();
+                *text_color = Color::WHITE.into();
 
                 // Match on the button's action to trigger the correct event
                 match menu_button_action {
                     MenuButtonAction::NewGame => {
                         println!("Starting a new game!");
-                        // You can add your game logic here, like spawning the player
+                        next_state.set(GameState::InGame);
                     }
                     MenuButtonAction::Settings => {
                         println!("Opening the settings menu.");
@@ -902,17 +923,25 @@ fn button_system(
                     }
                     MenuButtonAction::Quit => {
                         println!("Quitting the game.");
-                        // Bevy's built-in `AppExit` event can be used to close the app
+                        exit.write(AppExit::Success);
+                    }
+                    MenuButtonAction::Credits => {
+                        println!("Show credits.");
+                    }
+                    MenuButtonAction::Leaderboard => {
+                        println!("Show leaderboard.");
                     }
                 }
             }
             Interaction::Hovered => {
-                *color = HOVERED_BUTTON.into();
-                border_color.0 = Color::WHITE;
+                *color = Color::BLACK.into();
+                border_color.0 = Color::BLACK;
+                *text_color = Color::WHITE.into();
             }
             Interaction::None => {
-                *color = NORMAL_BUTTON.into();
+                *color = Color::WHITE.into();
                 border_color.0 = Color::BLACK;
+                *text_color = Color::BLACK.into();
             }
         }
     }
