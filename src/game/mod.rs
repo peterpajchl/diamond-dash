@@ -26,15 +26,16 @@ struct Background;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Score>()
+        app
+            .init_resource::<Score>()
             .add_systems(
                 OnEnter(GameState::InGame),
                 (
                     setup_game,
                     setup_background,
-                    setup_hero,
-                    setup_enemies,
-                    setup_diamonds,
+                    setup_hero.after(setup_game),
+                    setup_enemies.after(setup_game),
+                    setup_diamonds.after(setup_game),
                     setup_score_ui,
                 ),
             )
