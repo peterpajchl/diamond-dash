@@ -6,6 +6,7 @@ use diamond_dash::GameState;
 use diamond_dash::game::GamePlugin;
 use diamond_dash::menu::MenuPlugin;
 use diamond_dash::splash::SplashPlugin;
+use diamond_dash::gameover::GameOverPlugin;
 
 fn main() {
     App::new()
@@ -29,6 +30,6 @@ fn main() {
         .add_plugins(SplashPlugin)
         .add_plugins(MenuPlugin)
         .add_plugins(GamePlugin)
-        // add Game Over state
+        .add_plugins(GameOverPlugin)
         .run();
 }

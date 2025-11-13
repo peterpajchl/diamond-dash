@@ -124,6 +124,7 @@ fn setup_game(
             scale: 1.0,
             ..OrthographicProjection::default_2d()
         }),
+        OnGameScreen
     ));
 }
 
@@ -147,6 +148,7 @@ fn setup_background(
         },
         Transform::from_xyz(320.0, 160.0, -100.0).with_scale(Vec3::splat(0.5)),
         Background,
+        OnGameScreen
     ));
 }
 
@@ -221,7 +223,7 @@ fn collision_detection_diamonds(
     }
 
     let diamonds_remaining = diamond_query.iter().count();
-    println!("Diamonds left; {}", diamonds_remaining);
+    //println!("Diamonds left; {}", diamonds_remaining);
 
     // if player collects all diamonds, move to next Level
 }

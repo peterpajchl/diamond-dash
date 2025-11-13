@@ -1,6 +1,7 @@
 pub mod game;
 pub mod menu;
 pub mod splash;
+pub mod gameover;
 
 use bevy::prelude::*;
 

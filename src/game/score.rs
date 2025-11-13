@@ -66,8 +66,6 @@ pub(crate) fn update_score_ui(
     score: Res<Score>,
     mut query: Query<(Entity, &Text), With<ScoreDisplay>>,
 ) {
-    println!("Update score");
-    // Only update if the score has changed
     if score.is_changed() {
         if let Ok((entity, text_component)) = query.single_mut() {
             let updated_text_component = Text::new(format!("score {}", score.value));
