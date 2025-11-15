@@ -12,24 +12,41 @@ pub(crate) struct EnemyMovement {
 
 pub(crate) fn setup_enemies(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    asset_server: ResMut<AssetServer>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     println!("Setup enemies");
     let initial_enemies_count = 10;
-    let radius = 10.0;
     let enemy_speed = 50.0;
     let mut random_gen = rand::rng();
 
-    for x in 0..initial_enemies_count {
-        let x_pos = random_gen.random_range(10..630);
-        let y_pos = random_gen.random_range(10..310);
+    let texture = asset_server.load::<Image>("sprites/characters/enemy/idle/diamond_dash_monster_white_s.png");
+    let atlas = TextureAtlasLayout::from_grid(UVec2::new(48, 64), 8, 6, None, None);
 
-        let colour = Color::srgb(
-            (x as f32) / initial_enemies_count as f32,
-            1.0 - (x as f32) / initial_enemies_count as f32,
-            0.5,
-        );
+    // Hero spawn position (middle of screen)
+    let hero_spawn_x = 320.0;
+    let hero_spawn_y = 160.0;
+    let safe_zone_radius = 100.0; // Adjust this to control exclusion area size
+
+
+    for _ in 0..initial_enemies_count {
+
+        let mut x_pos;
+        let mut y_pos;
+        // Keep generating random positions until one is outside the safe zone
+        // For now, we should find something more determnistic later
+        loop {
+            x_pos = random_gen.random_range(10..630) as f32;
+            y_pos = random_gen.random_range(10..310) as f32;
+            
+            // Calculate distance from hero spawn point
+            let distance = ((x_pos - hero_spawn_x).powi(2) + (y_pos - hero_spawn_y).powi(2)).sqrt();
+            
+            // Accept position if it's outside the safe zone
+            if distance > safe_zone_radius {
+                break;
+            }
+        }
 
         let direction = if random_gen.random_bool(0.5) {
             1.0
@@ -38,9 +55,15 @@ pub(crate) fn setup_enemies(
         };
 
         commands.spawn((
-            Mesh2d(meshes.add(Circle::new(radius))),
-            MeshMaterial2d(materials.add(ColorMaterial::from_color(colour))),
-            Transform::from_xyz(x_pos as f32, y_pos as f32, 0.0),
+            Sprite {
+                image: texture.clone(),
+                texture_atlas: Some(TextureAtlas {
+                    layout: texture_atlas_layouts.add(atlas.clone()),
+                    index: 0,
+                }),
+                ..default()
+            },
+            Transform::from_xyz(x_pos as f32, y_pos as f32, 0.0).with_scale(Vec3::splat(1.0)),
             Enemy,
             EnemyMovement {
                 direction: Vec2::new(direction, direction),

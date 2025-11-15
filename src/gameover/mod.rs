@@ -101,7 +101,6 @@ fn button_system(
         ),
         (Changed<Interaction>, With<Button>),
     >,
-    mut exit: MessageWriter<AppExit>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     //println!("Handle buttons");
@@ -117,8 +116,7 @@ fn button_system(
                 // Match on the button's action to trigger the correct event
                 match menu_button_action {
                     MenuButtonAction::Ok => {
-                        println!("Starting a new game!");
-                        next_state.set(GameState::InGame);
+                        next_state.set(GameState::Menu);
                     }
                 }
             }
