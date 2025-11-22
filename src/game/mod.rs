@@ -139,7 +139,7 @@ fn setup_background(
     // Spawn the background image
     commands.spawn((
         Sprite {
-            image: asset_server.load("sprites/diamond_dash_bg.png"),
+            image: asset_server.load("sprites/diamond_dash_bg_1280.png"),
             texture_atlas: Some(TextureAtlas {
                 layout: bg_layout_handle,
                 index: 0,

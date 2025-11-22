@@ -57,6 +57,18 @@ fn setup_menu(mut commands: Commands) {
             OnGameOverScreen,
         ))
         .with_children(|parent| {
+
+            parent
+                .spawn((
+                    Text::new("Game Over"),
+                    TextFont {
+                        font_size: 48.0,
+                        font: Default::default(),
+                        ..default()
+                    },
+                    TextColor::from(Color::BLACK),
+                ));
+
             parent
                 .spawn((
                     Button,
