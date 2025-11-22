@@ -10,6 +10,72 @@ pub(crate) struct EnemyMovement {
     speed: f32,
 }
 
+#[derive(Component, Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub(crate) enum EnemyDirection {
+    Left,
+    LeftUp,
+    LeftDown,
+    Right,
+    RightUp,
+    RightDown,
+    Up,
+    Down,
+    None,
+}
+
+#[derive(Component, Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub(crate) enum EnemyAnimationState {
+    Idle,
+    Walk,
+    Jump,
+    Run,
+}
+
+#[derive(Component, Clone)]
+pub(crate) struct AnimationIndices {
+    first: usize,
+    last: usize,
+}
+
+impl AnimationIndices {
+    pub fn new(first: usize, last: usize) -> Self {
+        Self { first, last }
+    }
+}
+
+pub(crate) struct AnimationData {
+    pub texture_atlas: Handle<TextureAtlasLayout>,
+    pub frames: AnimationIndices,
+    pub texture: Handle<Image>,
+}
+
+#[derive(Resource)]
+pub(crate) struct EnemyAnimationData {
+    idle: AnimationData,
+    walk: AnimationData,
+    jump: AnimationData,
+    run: AnimationData,
+}
+
+impl EnemyAnimationData {
+    pub fn new(
+        idle: AnimationData,
+        walk: AnimationData,
+        jump: AnimationData,
+        run: AnimationData,
+    ) -> Self {
+        Self {
+            idle,
+            walk,
+            jump,
+            run,
+        }
+    }
+}
+
+#[derive(Component, Deref, DerefMut)]
+pub(crate) struct AnimationTimer(Timer);
+
 pub(crate) fn setup_enemies(
     mut commands: Commands,
     asset_server: ResMut<AssetServer>,
@@ -20,8 +86,8 @@ pub(crate) fn setup_enemies(
     let enemy_speed = 50.0;
     let mut random_gen = rand::rng();
 
-    let texture = asset_server.load::<Image>("sprites/characters/enemy/idle/diamond_dash_monster_white_s.png");
-    let atlas = TextureAtlasLayout::from_grid(UVec2::new(48, 64), 8, 6, None, None);
+    let texture = asset_server.load::<Image>("sprites/characters/enemy/idle/idle_clear.png");
+    let atlas = TextureAtlasLayout::from_grid(UVec2::new(194, 300), 8, 8, None, None);
 
     // Hero spawn position (middle of screen)
     let hero_spawn_x = 320.0;
@@ -108,5 +174,139 @@ pub(crate) fn enemies_movement(
 
         // Apply the new translation
         transform.translation = translation;
+    }
+}
+
+pub(crate) fn update_enemy_animation(
+    mut query: Query<(
+        &EnemyAnimationState,
+        &EnemyDirection,
+        &mut Sprite,
+        &mut AnimationTimer,
+    )>,
+    player_animation_data: Res<EnemyAnimationData>, // Access the animation data
+) {
+    //println!("Update player animation");
+    for (current_state, player_direction, mut sprite, mut animation_timer) in &mut query {
+        // Change animation data if the state has changed
+        let new_texture_handle = match *current_state {
+            EnemyAnimationState::Idle => player_animation_data.idle.texture.clone(),
+            EnemyAnimationState::Walk => player_animation_data.walk.texture.clone(),
+            EnemyAnimationState::Jump => player_animation_data.jump.texture.clone(),
+            EnemyAnimationState::Run => player_animation_data.run.texture.clone(),
+        };
+
+        let new_atlas_layout_handle = match *current_state {
+            EnemyAnimationState::Idle => player_animation_data.idle.texture_atlas.clone(),
+            EnemyAnimationState::Walk => player_animation_data.walk.texture_atlas.clone(),
+            EnemyAnimationState::Jump => player_animation_data.jump.texture_atlas.clone(),
+            EnemyAnimationState::Run => player_animation_data.run.texture_atlas.clone(),
+        };
+
+        let new_animation_indices = match *current_state {
+            EnemyAnimationState::Idle => player_animation_data.idle.frames.clone(),
+            EnemyAnimationState::Walk => {
+                match player_direction {
+                    EnemyDirection::Down => player_animation_data.walk.frames.clone(),
+                    EnemyDirection::Up => AnimationIndices {
+                        first: 24,
+                        last: 31,
+                    },
+                    EnemyDirection::Left => AnimationIndices { first: 8, last: 15 },
+                    EnemyDirection::Right => AnimationIndices {
+                        first: 40,
+                        last: 47,
+                    },
+                    EnemyDirection::LeftUp => AnimationIndices {
+                        first: 16,
+                        last: 23,
+                    },
+                    EnemyDirection::RightUp => AnimationIndices {
+                        first: 32,
+                        last: 39,
+                    },
+                    EnemyDirection::LeftDown => AnimationIndices { first: 8, last: 15 },
+                    EnemyDirection::RightDown => AnimationIndices {
+                        first: 40,
+                        last: 47,
+                    },
+                    _ => player_animation_data.walk.frames.clone(), // Default to walk frames
+                }
+            }
+            EnemyAnimationState::Jump => player_animation_data.jump.frames.clone(),
+            EnemyAnimationState::Run => player_animation_data.run.frames.clone(),
+        };
+
+        if sprite.texture_atlas.is_none()
+            || sprite.texture_atlas.as_ref().unwrap().layout != new_atlas_layout_handle
+        {
+            if let Some(atlas) = &mut sprite.texture_atlas {
+                // Update the sprite's texture atlas and index
+                atlas.layout = new_atlas_layout_handle;
+                atlas.index = new_animation_indices.first; // Reset to the first frame of the new animation
+            }
+
+            sprite.image = new_texture_handle;
+            animation_timer.reset(); // Reset animation timer
+        }
+    }
+}
+
+pub(crate) fn animate_sprite(
+    time: Res<Time>,
+    mut query: Query<(
+        &mut AnimationTimer,
+        &mut Sprite,
+        &EnemyAnimationState,
+        &EnemyDirection,
+    )>,
+    enemy_animation_data: Res<EnemyAnimationData>,
+) {
+    //println!("Animate sprites");
+    for (mut timer, mut sprite, animation_state, player_direction) in &mut query {
+        timer.tick(time.delta());
+
+        // Determine correct indices for current animation and direction
+        let indices = match *animation_state {
+            EnemyAnimationState::Idle => enemy_animation_data.idle.frames.clone(),
+            EnemyAnimationState::Walk => match player_direction {
+                EnemyDirection::Down => enemy_animation_data.walk.frames.clone(),
+                EnemyDirection::Up => AnimationIndices {
+                    first: 24,
+                    last: 31,
+                },
+                EnemyDirection::Left => AnimationIndices { first: 8, last: 15 },
+                EnemyDirection::Right => AnimationIndices {
+                    first: 40,
+                    last: 47,
+                },
+                EnemyDirection::LeftUp => AnimationIndices {
+                    first: 16,
+                    last: 23,
+                },
+                EnemyDirection::LeftDown => AnimationIndices { first: 8, last: 15 },
+                EnemyDirection::RightUp => AnimationIndices {
+                    first: 32,
+                    last: 39,
+                },
+                EnemyDirection::RightDown => AnimationIndices {
+                    first: 40,
+                    last: 47,
+                },
+                _ => enemy_animation_data.walk.frames.clone(),
+            },
+            EnemyAnimationState::Jump => enemy_animation_data.jump.frames.clone(),
+            EnemyAnimationState::Run => enemy_animation_data.run.frames.clone(),
+        };
+
+        if timer.just_finished() {
+            if let Some(atlas) = &mut sprite.texture_atlas {
+                atlas.index = if atlas.index >= indices.last {
+                    indices.first
+                } else {
+                    atlas.index + 1
+                };
+            }
+        }
     }
 }
