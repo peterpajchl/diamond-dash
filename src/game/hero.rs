@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use crate::game::AnimationIndices;
+use crate::game::AnimationData;
 
 #[derive(Component)]
 pub(crate) struct Player;
@@ -22,24 +24,6 @@ pub(crate) enum PlayerAnimationState {
     Walk,
     Jump,
     Run,
-}
-
-#[derive(Component, Clone)]
-pub(crate) struct AnimationIndices {
-    first: usize,
-    last: usize,
-}
-
-impl AnimationIndices {
-    pub fn new(first: usize, last: usize) -> Self {
-        Self { first, last }
-    }
-}
-
-pub(crate) struct AnimationData {
-    pub texture_atlas: Handle<TextureAtlasLayout>,
-    pub frames: AnimationIndices,
-    pub texture: Handle<Image>,
 }
 
 #[derive(Resource)]

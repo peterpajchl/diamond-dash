@@ -5,9 +5,9 @@ mod score;
 use crate::GameState;
 use crate::despawn_screen;
 use bevy::prelude::*;
-use enemies::{Enemy, enemies_movement, setup_enemies};
+use enemies::{Enemy, enemies_movement, setup_enemies, update_enemy_animation, animate_sprite as enemy_animate_sprite, EnemyAnimationData};
 use hero::{
-    AnimationData, AnimationIndices, Player, PlayerAnimationData, animate_sprite, player_movement,
+    Player, PlayerAnimationData, animate_sprite, player_movement,
     setup_hero, update_player_animation,
 };
 use rand::Rng;
@@ -23,6 +23,24 @@ struct Diamond;
 
 #[derive(Component)]
 struct Background;
+
+#[derive(Component, Clone)]
+pub(crate) struct AnimationIndices {
+    first: usize,
+    last: usize,
+}
+
+impl AnimationIndices {
+    pub fn new(first: usize, last: usize) -> Self {
+        Self { first, last }
+    }
+}
+
+pub(crate) struct AnimationData {
+    pub texture_atlas: Handle<TextureAtlasLayout>,
+    pub frames: AnimationIndices,
+    pub texture: Handle<Image>,
+}
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
@@ -44,7 +62,9 @@ impl Plugin for GamePlugin {
                 (
                     player_movement,
                     animate_sprite,
+                    enemy_animate_sprite,
                     update_player_animation,
+                    update_enemy_animation,
                     update_score_ui,
                     collision_detection,
                     collision_detection_diamonds,
@@ -62,6 +82,12 @@ fn setup_game(
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
     println!("Setup game");
+
+    // load enemy texture and atlas
+    let enemy_texture_walk = asset_server.load::<Image>("sprites/characters/enemy/walk/walk.png");
+    let enemy_walk_atlas_layout = TextureAtlasLayout::from_grid(UVec2::new(48, 64), 8, 6, None, None);
+    let enemy_wakl_atlas_handle = texture_atlas_layouts.add(enemy_walk_atlas_layout);
+
     // Load textures for all animations
     let texture_idle = asset_server.load::<Image>("sprites/characters/hero/idle/idle.png");
     let texture_walk = asset_server.load::<Image>("sprites/characters/hero/walk/walk.png");
@@ -104,6 +130,14 @@ fn setup_game(
             texture_atlas: run_atlas_handle,
             texture: texture_run,
             frames: run_frames,
+        },
+    ));
+
+    commands.insert_resource(EnemyAnimationData::new(
+        AnimationData {
+            texture_atlas: enemy_wakl_atlas_handle,
+            texture: enemy_texture_walk,
+            frames: AnimationIndices::new(0, 7),
         },
     ));
 

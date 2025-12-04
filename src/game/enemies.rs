@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 use rand::Rng;
+use crate::game::AnimationIndices;
+use crate::game::AnimationData;
 
 #[derive(Component)]
 pub(crate) struct Enemy;
@@ -25,50 +27,20 @@ pub(crate) enum EnemyDirection {
 
 #[derive(Component, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum EnemyAnimationState {
-    Idle,
     Walk,
-    Jump,
-    Run,
-}
-
-#[derive(Component, Clone)]
-pub(crate) struct AnimationIndices {
-    first: usize,
-    last: usize,
-}
-
-impl AnimationIndices {
-    pub fn new(first: usize, last: usize) -> Self {
-        Self { first, last }
-    }
-}
-
-pub(crate) struct AnimationData {
-    pub texture_atlas: Handle<TextureAtlasLayout>,
-    pub frames: AnimationIndices,
-    pub texture: Handle<Image>,
 }
 
 #[derive(Resource)]
 pub(crate) struct EnemyAnimationData {
-    idle: AnimationData,
     walk: AnimationData,
-    jump: AnimationData,
-    run: AnimationData,
 }
 
 impl EnemyAnimationData {
     pub fn new(
-        idle: AnimationData,
         walk: AnimationData,
-        jump: AnimationData,
-        run: AnimationData,
     ) -> Self {
         Self {
-            idle,
             walk,
-            jump,
-            run,
         }
     }
 }
@@ -78,16 +50,12 @@ pub(crate) struct AnimationTimer(Timer);
 
 pub(crate) fn setup_enemies(
     mut commands: Commands,
-    asset_server: ResMut<AssetServer>,
-    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+    animation_data: Res<EnemyAnimationData>
 ) {
     println!("Setup enemies");
-    let initial_enemies_count = 10;
+    let initial_enemies_count = 1;//10;
     let enemy_speed = 50.0;
     let mut random_gen = rand::rng();
-
-    let texture = asset_server.load::<Image>("sprites/characters/enemy/idle/idle_clear.png");
-    let atlas = TextureAtlasLayout::from_grid(UVec2::new(194, 300), 8, 8, None, None);
 
     // Hero spawn position (middle of screen)
     let hero_spawn_x = 320.0;
@@ -122,9 +90,9 @@ pub(crate) fn setup_enemies(
 
         commands.spawn((
             Sprite {
-                image: texture.clone(),
+                image: animation_data.walk.texture.clone(),
                 texture_atlas: Some(TextureAtlas {
-                    layout: texture_atlas_layouts.add(atlas.clone()),
+                    layout: animation_data.walk.texture_atlas.clone(),
                     index: 0,
                 }),
                 ..default()
@@ -135,12 +103,15 @@ pub(crate) fn setup_enemies(
                 direction: Vec2::new(direction, direction),
                 speed: enemy_speed,
             },
+            EnemyAnimationState::Walk,
+            EnemyDirection::Down,
+            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating))
         ));
     }
 }
 
 pub(crate) fn enemies_movement(
-    mut query: Query<(&mut Transform, &mut EnemyMovement)>,
+    mut query: Query<(&mut Transform, &mut EnemyMovement, &mut EnemyAnimationState, &mut EnemyDirection)>,
     window_query: Query<&Window, With<Window>>,
     time: Res<Time>,
 ) {
@@ -155,7 +126,7 @@ pub(crate) fn enemies_movement(
     let y_min = 0.0;
     let y_max = window_height;
 
-    for (mut transform, mut enemy_movement) in &mut query {
+    for (mut transform, mut enemy_movement, mut animation_state, mut enemy_direction) in &mut query {
         let mut translation = transform.translation;
 
         // Update position based on current direction and speed
@@ -174,6 +145,25 @@ pub(crate) fn enemies_movement(
 
         // Apply the new translation
         transform.translation = translation;
+        *enemy_direction = if enemy_movement.direction.x > 0.0 && enemy_movement.direction.y > 0.0 {
+            EnemyDirection::RightUp
+        } else if enemy_movement.direction.x > 0.0 && enemy_movement.direction.y < 0.0 {
+            EnemyDirection::RightDown
+        } else if enemy_movement.direction.x < 0.0 && enemy_movement.direction.y > 0.0 {
+            EnemyDirection::LeftUp
+        } else if enemy_movement.direction.x < 0.0 && enemy_movement.direction.y < 0.0 {
+            EnemyDirection::LeftDown
+        } else if enemy_movement.direction.x > 0.0 {
+            EnemyDirection::Right
+        } else if enemy_movement.direction.x < 0.0 {
+            EnemyDirection::Left
+        } else if enemy_movement.direction.y > 0.0 {
+            EnemyDirection::Up
+        } else if enemy_movement.direction.y < 0.0 {
+            EnemyDirection::Down
+        } else {
+            EnemyDirection::None
+        };
     }
 }
 
@@ -190,21 +180,14 @@ pub(crate) fn update_enemy_animation(
     for (current_state, player_direction, mut sprite, mut animation_timer) in &mut query {
         // Change animation data if the state has changed
         let new_texture_handle = match *current_state {
-            EnemyAnimationState::Idle => player_animation_data.idle.texture.clone(),
             EnemyAnimationState::Walk => player_animation_data.walk.texture.clone(),
-            EnemyAnimationState::Jump => player_animation_data.jump.texture.clone(),
-            EnemyAnimationState::Run => player_animation_data.run.texture.clone(),
         };
 
         let new_atlas_layout_handle = match *current_state {
-            EnemyAnimationState::Idle => player_animation_data.idle.texture_atlas.clone(),
             EnemyAnimationState::Walk => player_animation_data.walk.texture_atlas.clone(),
-            EnemyAnimationState::Jump => player_animation_data.jump.texture_atlas.clone(),
-            EnemyAnimationState::Run => player_animation_data.run.texture_atlas.clone(),
         };
 
         let new_animation_indices = match *current_state {
-            EnemyAnimationState::Idle => player_animation_data.idle.frames.clone(),
             EnemyAnimationState::Walk => {
                 match player_direction {
                     EnemyDirection::Down => player_animation_data.walk.frames.clone(),
@@ -233,8 +216,6 @@ pub(crate) fn update_enemy_animation(
                     _ => player_animation_data.walk.frames.clone(), // Default to walk frames
                 }
             }
-            EnemyAnimationState::Jump => player_animation_data.jump.frames.clone(),
-            EnemyAnimationState::Run => player_animation_data.run.frames.clone(),
         };
 
         if sprite.texture_atlas.is_none()
@@ -268,7 +249,6 @@ pub(crate) fn animate_sprite(
 
         // Determine correct indices for current animation and direction
         let indices = match *animation_state {
-            EnemyAnimationState::Idle => enemy_animation_data.idle.frames.clone(),
             EnemyAnimationState::Walk => match player_direction {
                 EnemyDirection::Down => enemy_animation_data.walk.frames.clone(),
                 EnemyDirection::Up => AnimationIndices {
@@ -295,8 +275,6 @@ pub(crate) fn animate_sprite(
                 },
                 _ => enemy_animation_data.walk.frames.clone(),
             },
-            EnemyAnimationState::Jump => enemy_animation_data.jump.frames.clone(),
-            EnemyAnimationState::Run => enemy_animation_data.run.frames.clone(),
         };
 
         if timer.just_finished() {
