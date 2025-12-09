@@ -25,6 +25,11 @@ pub(crate) enum EnemyDirection {
     None,
 }
 
+// New component to remember previous direction per enemy
+#[derive(Component, Deref, DerefMut)]
+pub(crate) struct PreviousEnemyDirection(pub EnemyDirection);
+
+
 #[derive(Component, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum EnemyAnimationState {
     Walk,
@@ -105,6 +110,7 @@ pub(crate) fn setup_enemies(
             },
             EnemyAnimationState::Walk,
             EnemyDirection::Down,
+            PreviousEnemyDirection(EnemyDirection::Down),
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating))
         ));
     }
@@ -145,6 +151,7 @@ pub(crate) fn enemies_movement(
 
         // Apply the new translation
         transform.translation = translation;
+
         *enemy_direction = if enemy_movement.direction.x > 0.0 && enemy_movement.direction.y > 0.0 {
             EnemyDirection::RightUp
         } else if enemy_movement.direction.x > 0.0 && enemy_movement.direction.y < 0.0 {
@@ -173,62 +180,56 @@ pub(crate) fn update_enemy_animation(
         &EnemyDirection,
         &mut Sprite,
         &mut AnimationTimer,
+        &mut PreviousEnemyDirection,
     )>,
     player_animation_data: Res<EnemyAnimationData>, // Access the animation data
 ) {
     //println!("Update player animation");
-    for (current_state, player_direction, mut sprite, mut animation_timer) in &mut query {
-        // Change animation data if the state has changed
-        let new_texture_handle = match *current_state {
-            EnemyAnimationState::Walk => player_animation_data.walk.texture.clone(),
+    for (current_state, enemy_direction, mut sprite, mut animation_timer, mut prev_direction) in &mut query {
+        //Change animation data if the state has changed
+        //let new_texture_handle = match *current_state {
+        //     EnemyAnimationState::Walk => player_animation_data.walk.texture.clone(),
+        // };
+
+        // let new_atlas_layout_handle = match *current_state {
+        //     EnemyAnimationState::Walk => player_animation_data.walk.texture_atlas.clone(),
+        // };
+println!("Enemy direction: {:?}", enemy_direction);
+        let new_animation_indices = match enemy_direction {
+            EnemyDirection::Down => player_animation_data.walk.frames.clone(),
+            EnemyDirection::Up => AnimationIndices {
+                first: 24,
+                last: 31,
+            },
+            EnemyDirection::Left => AnimationIndices { first: 8, last: 15 },
+            EnemyDirection::Right => AnimationIndices {
+                first: 40,
+                last: 47,
+            },
+            EnemyDirection::LeftUp => AnimationIndices {
+                first: 16,
+                last: 23,
+            },
+            EnemyDirection::RightUp => AnimationIndices {
+                first: 32,
+                last: 39,
+            },
+            EnemyDirection::LeftDown => AnimationIndices { first: 8, last: 15 },
+            EnemyDirection::RightDown => AnimationIndices {
+                first: 40,
+                last: 47,
+            },
+            _ => player_animation_data.walk.frames.clone(), // Default to walk frames
         };
 
-        let new_atlas_layout_handle = match *current_state {
-            EnemyAnimationState::Walk => player_animation_data.walk.texture_atlas.clone(),
-        };
-
-        let new_animation_indices = match *current_state {
-            EnemyAnimationState::Walk => {
-                match player_direction {
-                    EnemyDirection::Down => player_animation_data.walk.frames.clone(),
-                    EnemyDirection::Up => AnimationIndices {
-                        first: 24,
-                        last: 31,
-                    },
-                    EnemyDirection::Left => AnimationIndices { first: 8, last: 15 },
-                    EnemyDirection::Right => AnimationIndices {
-                        first: 40,
-                        last: 47,
-                    },
-                    EnemyDirection::LeftUp => AnimationIndices {
-                        first: 16,
-                        last: 23,
-                    },
-                    EnemyDirection::RightUp => AnimationIndices {
-                        first: 32,
-                        last: 39,
-                    },
-                    EnemyDirection::LeftDown => AnimationIndices { first: 8, last: 15 },
-                    EnemyDirection::RightDown => AnimationIndices {
-                        first: 40,
-                        last: 47,
-                    },
-                    _ => player_animation_data.walk.frames.clone(), // Default to walk frames
-                }
-            }
-        };
-
-        if sprite.texture_atlas.is_none()
-            || sprite.texture_atlas.as_ref().unwrap().layout != new_atlas_layout_handle
-        {
+        // Only change/reset animation if the direction actually changed
+        if prev_direction.0 != *enemy_direction {
+            // update atlas index to the first frame for the new direction
             if let Some(atlas) = &mut sprite.texture_atlas {
-                // Update the sprite's texture atlas and index
-                atlas.layout = new_atlas_layout_handle;
-                atlas.index = new_animation_indices.first; // Reset to the first frame of the new animation
+                atlas.index = new_animation_indices.first;
             }
-
-            sprite.image = new_texture_handle;
-            animation_timer.reset(); // Reset animation timer
+            animation_timer.reset(); // restart the frame timer for the new animation
+            prev_direction.0 = *enemy_direction; // store the current direction
         }
     }
 }
@@ -250,28 +251,25 @@ pub(crate) fn animate_sprite(
         // Determine correct indices for current animation and direction
         let indices = match *animation_state {
             EnemyAnimationState::Walk => match player_direction {
-                EnemyDirection::Down => enemy_animation_data.walk.frames.clone(),
-                EnemyDirection::Up => AnimationIndices {
-                    first: 24,
-                    last: 31,
-                },
+                EnemyDirection::Down => AnimationIndices::new(0, 7),
+                EnemyDirection::Up => AnimationIndices {first: 24, last: 31},
                 EnemyDirection::Left => AnimationIndices { first: 8, last: 15 },
                 EnemyDirection::Right => AnimationIndices {
-                    first: 40,
-                    last: 47,
-                },
-                EnemyDirection::LeftUp => AnimationIndices {
                     first: 16,
                     last: 23,
                 },
-                EnemyDirection::LeftDown => AnimationIndices { first: 8, last: 15 },
-                EnemyDirection::RightUp => AnimationIndices {
+                EnemyDirection::LeftUp => AnimationIndices {
                     first: 32,
                     last: 39,
                 },
+                EnemyDirection::LeftDown => AnimationIndices { first: 8, last: 15 },
+                EnemyDirection::RightUp => AnimationIndices {
+                    first: 16,
+                    last: 23,
+                },
                 EnemyDirection::RightDown => AnimationIndices {
-                    first: 40,
-                    last: 47,
+                    first: 16,
+                    last: 23,
                 },
                 _ => enemy_animation_data.walk.frames.clone(),
             },
